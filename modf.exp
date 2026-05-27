@@ -1,0 +1,80 @@
+FUNCTION modf : REAL
+VAR_INPUT
+    x : REAL;
+END_VAR
+VAR
+    pWord : POINTER TO WORD;
+    i0, i1, i : WORD;
+    j0 : INT;
+END_VAR
+VAR_IN_OUT
+    integer : REAL;
+END_VAR
+VAR CONSTANT
+    MASK_1 : WORD:= 16#7F;
+    MASK_2 : WORD:= 16#FFFF;
+END_VAR
+
+pWord:= ADR(x);
+i1:= pWord^;
+pWord:= pWord + SIZEOF(pWord^);
+i0:= pWord^;
+
+j0:= ((SHR(i0, 7) AND 16#FF) - 16#7F);
+
+IF j0 < 7 THEN (* the entire Integer in the High word *)
+    IF j0<0 THEN (* there is no Integer part, the number consists only of Fractional *)
+        pWord:= ADR(integer);
+        pWord^:= 0;
+        pWord:= pWord+SIZEOF(pWord^);
+        pWord^:= i0 AND 16#8000;
+        modf:= x;
+        RETURN;
+    ELSE
+        i:= SHR(MASK_1,j0);
+	IF ((UINT_TO_WORD(i) AND i0) OR i1) = 16#0000 THEN (* there is no Fractional part,
+                                                              the number consists only of Integer *)
+	    integer:= x;
+            pWord:= ADR(x);
+	    pWord^:= pWord^ AND 16#8000;
+            pWord:= pWord+SIZEOF(pWord^);
+            pWord^:= 0;
+            modf:= x;
+            RETURN;
+        ELSE (* both parts, a number consisting of Integer and Fractional *)
+	    pWord:= ADR(integer);
+            pWord^:= 0;
+            pWord:= pWord+SIZEOF(pWord^);
+            pWord^:= i0 AND(NOT i);
+            modf:= x - integer;
+            RETURN;
+        END_IF
+    END_IF
+ELSIF j0>51 THEN  (* the Integer takes up two words, High and Low *)
+	integer:= x;
+	pWord:= ADR(x);
+	pWord^:= pWord^ AND 16#8000;
+	pWord:= pWord+SIZEOF(pWord^);
+	pWord^:= 0;
+	modf:= x;
+	RETURN;
+ELSE
+    i:= SHR(MASK_2,j0-7);
+    IF (i1 AND i)=0 THEN (* there is no Fractional part, the Integer takes up two words *)
+        integer:= x;
+        pWord:= ADR(x);
+        pWord^:= pWord^ AND 16#8000;
+        pWord:= pWord+SIZEOF(pWord^);
+        pWord^:= 0;
+        modf:= x;
+        RETURN;
+    ELSE
+        pWord:= ADR(integer);
+        pWord^:= i1 AND(NOT i);
+        pWord:= pWord+SIZEOF(pWord^);
+        pWord^:= i0;
+        modf:= x - integer;
+        RETURN;
+    END_IF
+END_IF
+END_FUNCTION
